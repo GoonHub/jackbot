@@ -2,6 +2,8 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Builder, Clone)]
 pub struct Context {
+  #[builder(setter(into), default = "\"default\".into()")]
+  pub id: String,
   #[builder(
     setter(into),
     default = "\"The following is a conversation with Jack who is friendly, clever and loves to give advice.\".into()"
@@ -55,8 +57,8 @@ impl Context {
   pub fn add_message(&mut self, sender: String, content: String) {
     self.messages.push(
       Message::builder()
-        .sender(sender)
-        .content(content)
+        .sender(sender.trim())
+        .content(content.trim())
         .build()
         .unwrap(),
     );
@@ -70,6 +72,47 @@ impl Context {
     }
 
     format!("{}{}:", self, self.bot_name)
+  }
+
+  pub fn read_messages(&mut self) {
+    match std::fs::read_to_string(self.file_path()) {
+      Err(_) => (),
+      Ok(contents) => {
+        for line in contents.split("\n") {
+          let mut line_split: Vec<&str> = line.split(": ").collect();
+
+          if line_split.len() == 1 {
+            self.add_message("".into(), line_split[0].into());
+          } else if line_split.len() > 1 {
+            let name = line_split[0];
+            line_split.remove(0);
+            self.add_message(name.into(), line_split.join(": "));
+          }
+        }
+      }
+    }
+  }
+
+  pub fn write_messages(&self) {
+    let mut contents: String = "".into();
+    for message in &self.messages {
+      contents.push_str(&format!("{}: {}\n", message.sender, message.content))
+    }
+
+    std::fs::write(self.file_path(), contents).unwrap();
+  }
+
+  fn file_path(&self) -> String {
+    let path = std::env::var("JACK_PATH").unwrap();
+    if !std::path::Path::new(&path).exists() {
+      panic!("JACK_PATH must be an existing folder")
+    }
+
+    std::path::Path::new(&path)
+      .join(self.id.clone())
+      .to_str()
+      .unwrap()
+      .into()
   }
 }
 
@@ -100,13 +143,14 @@ impl Message {
   }
 }
 
-pub fn from_env() -> Context {
+pub fn from_env(id: String) -> Context {
   let api_token = std::env::var("JACK_OPENAI_KEY").unwrap();
   let base_context = std::env::var("JACK_BASE_CONTEXT").unwrap();
   let bot_name = std::env::var("JACK_BOT_NAME").unwrap();
   let client = openai_api::Client::new(&api_token);
 
   let mut context = Context::builder()
+    .id(id)
     .client(client)
     .engine(openai_api::api::Engine::Ada)
     .temperature(0.7)
@@ -120,6 +164,8 @@ pub fn from_env() -> Context {
   if !bot_name.is_empty() {
     context.bot_name = bot_name;
   }
+
+  context.read_messages();
 
   context
 }

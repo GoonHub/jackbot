@@ -3,6 +3,8 @@ extern crate derive_builder;
 
 mod cli;
 mod context;
+mod discord;
+mod openai;
 mod stdio;
 
 #[tokio::main]
