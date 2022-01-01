@@ -5,11 +5,12 @@ use serenity::framework::standard::{
   CommandResult, StandardFramework,
 };
 use serenity::model::channel::Message;
+use std::time::SystemTime;
 
 use std::env;
 
 #[group]
-#[commands(jack)]
+#[commands(jack, more, reset)]
 struct General;
 
 struct Handler;
@@ -51,8 +52,33 @@ async fn jack(ctx: &Context, msg: &Message) -> CommandResult {
 
   let completion = context.completion().await.unwrap();
   msg.reply(ctx, completion).await.unwrap();
-
   context.write_messages();
+
+  Ok(())
+}
+
+#[command]
+async fn more(ctx: &Context, msg: &Message) -> CommandResult {
+  let mut context = crate::context::from_env(msg.channel_id.to_string());
+  let completion = context.completion().await.unwrap();
+  msg.reply(ctx, completion).await.unwrap();
+  context.write_messages();
+
+  Ok(())
+}
+
+#[command]
+async fn reset(ctx: &Context, msg: &Message) -> CommandResult {
+  let context = crate::context::from_env(msg.channel_id.to_string());
+  let path = context.file_path();
+  let time = SystemTime::now()
+    .duration_since(SystemTime::UNIX_EPOCH)
+    .unwrap()
+    .as_secs();
+  let target = format!("{}.{}", path, time);
+  std::fs::rename(path, target).unwrap();
+
+  msg.reply(ctx, "Reset :slight_smile:").await.unwrap();
 
   Ok(())
 }

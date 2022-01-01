@@ -4,13 +4,13 @@ pub fn app() -> App<'static> {
   App::new("jackbot")
     .about("Chat with Jack")
     .subcommand(App::new("chat").about("Talk to Jack through your terminal"))
-    .subcommand(App::new("server").about("Start the Discord bot server"))
+    .subcommand(App::new("bot").about("Start the Discord bot server"))
 }
 
 pub async fn match_cmd(matches: ArgMatches) {
   match matches.subcommand() {
     Some(("chat", chat_m)) => cmd_chat(chat_m).await,
-    Some(("server", server_m)) => cmd_server(server_m).await,
+    Some(("bot", bot_m)) => cmd_server(bot_m).await,
     _ => eprintln!("subcommand is required, use help for more details"),
   }
 }

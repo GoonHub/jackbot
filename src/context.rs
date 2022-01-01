@@ -45,8 +45,6 @@ impl Context {
       self.add_message(self.bot_name.clone(), text.clone());
     }
 
-    println!("{}", self);
-
     if text.is_empty() {
       Ok("?".into())
     } else {
@@ -108,7 +106,7 @@ impl Context {
     std::fs::write(self.file_path(), contents).unwrap();
   }
 
-  fn file_path(&self) -> String {
+  pub fn file_path(&self) -> String {
     let path = std::env::var("JACK_PATH").unwrap();
     if !std::path::Path::new(&path).exists() {
       panic!("JACK_PATH must be an existing folder")
@@ -155,8 +153,8 @@ pub fn from_env(id: String) -> Context {
 
   let mut context = Context::builder()
     .id(id)
-    .engine("babbage".into())
-    .temperature(0.7)
+    .engine("curie".into())
+    .temperature(1.0)
     .build()
     .unwrap();
 
