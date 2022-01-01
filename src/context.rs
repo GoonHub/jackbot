@@ -99,3 +99,27 @@ impl Message {
     MessageBuilder::default()
   }
 }
+
+pub fn from_env() -> Context {
+  let api_token = std::env::var("JACK_OPENAI_KEY").unwrap();
+  let base_context = std::env::var("JACK_BASE_CONTEXT").unwrap();
+  let bot_name = std::env::var("JACK_BOT_NAME").unwrap();
+  let client = openai_api::Client::new(&api_token);
+
+  let mut context = Context::builder()
+    .client(client)
+    .engine(openai_api::api::Engine::Ada)
+    .temperature(0.7)
+    .build()
+    .unwrap();
+
+  if !base_context.is_empty() {
+    context.base = base_context;
+  }
+
+  if !bot_name.is_empty() {
+    context.bot_name = bot_name;
+  }
+
+  context
+}
