@@ -44,12 +44,13 @@ pub async fn bot() {
 async fn jack(ctx: &Context, msg: &Message) -> CommandResult {
   let mut context = crate::context::from_env(msg.channel_id.to_string());
 
-  for mut message in msg.content.split("\n") {
+  for mut message in msg.content.trim().split("\n") {
     message = message.trim_start_matches("!jack ");
     context.add_message(msg.author.name.clone(), message.into());
   }
 
-  msg.reply(ctx, context.completion().await?).await?;
+  let completion = context.completion().await.unwrap();
+  msg.reply(ctx, completion).await.unwrap();
 
   context.write_messages();
 

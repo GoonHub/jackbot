@@ -12,15 +12,13 @@ pub struct Context {
   #[builder(default = "20")]
   pub max_replies: u16,
   #[builder(default = "50")]
-  pub max_tokens: u64,
+  pub max_tokens: u16,
   #[builder(default = "1.0")]
-  pub temperature: f64,
+  pub temperature: f32,
   #[builder(setter(into), default = "\"Jack\".into()")]
   pub bot_name: String,
-  #[builder(default = "openai_api::Client::new(\"\")")]
-  client: openai_api::Client,
-  #[builder(default = "openai_api::api::Engine::Davinci")]
-  engine: openai_api::api::Engine,
+  #[builder(default = "\"ada\".into()")]
+  engine: String,
   #[builder(default = "vec![]")]
   messages: Vec<Message>,
 }
@@ -31,21 +29,23 @@ impl Context {
     ContextBuilder::default()
   }
 
-  pub async fn completion(&mut self) -> Result<String, openai_api::Error> {
-    let args = openai_api::api::CompletionArgs::builder()
+  pub async fn completion(&mut self) -> Result<String, Box<dyn std::error::Error>> {
+    let args = crate::openai::CompletionArgs::builder()
       .prompt(self.clone().prompt())
-      .engine(self.engine)
+      .engine(self.engine.clone())
       .max_tokens(self.max_tokens)
       .temperature(self.temperature)
       .stop(vec!["\n".into(), ".".into()])
       .build()?;
 
-    let completion = self.client.complete_prompt(args).await?;
+    let completion = crate::openai::completion(&args).await.unwrap();
     let text: String = format!("{}", completion.choices[0].text).trim().into();
 
     if !text.is_empty() && !text.eq("?") {
       self.add_message(self.bot_name.clone(), text.clone());
     }
+
+    println!("{}", self);
 
     if text.is_empty() {
       Ok("?".into())
@@ -66,8 +66,14 @@ impl Context {
 
   pub fn prompt(&self) -> String {
     let mut prompt = format!("{}\n\n", self.base);
+    let trimmed_messages = self
+      .messages
+      .iter()
+      .rev()
+      .take(self.max_replies.into())
+      .rev();
 
-    for message in &self.messages {
+    for message in trimmed_messages {
       prompt.push_str(format!("{}: {}\n", message.sender, message.content).as_ref());
     }
 
@@ -78,7 +84,7 @@ impl Context {
     match std::fs::read_to_string(self.file_path()) {
       Err(_) => (),
       Ok(contents) => {
-        for line in contents.split("\n") {
+        for line in contents.trim().split("\n") {
           let mut line_split: Vec<&str> = line.split(": ").collect();
 
           if line_split.len() == 1 {
@@ -144,15 +150,12 @@ impl Message {
 }
 
 pub fn from_env(id: String) -> Context {
-  let api_token = std::env::var("JACK_OPENAI_KEY").unwrap();
   let base_context = std::env::var("JACK_BASE_CONTEXT").unwrap();
   let bot_name = std::env::var("JACK_BOT_NAME").unwrap();
-  let client = openai_api::Client::new(&api_token);
 
   let mut context = Context::builder()
     .id(id)
-    .client(client)
-    .engine(openai_api::api::Engine::Ada)
+    .engine("babbage".into())
     .temperature(0.7)
     .build()
     .unwrap();
