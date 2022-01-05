@@ -4,6 +4,7 @@ extern crate derive_builder;
 mod cli;
 mod context;
 mod discord;
+mod env;
 mod openai;
 mod stdio;
 

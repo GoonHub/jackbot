@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Formatter};
+use std::time::SystemTime;
 
 #[derive(Builder, Clone)]
 pub struct Context {
@@ -63,7 +64,7 @@ impl Context {
   }
 
   pub fn prompt(&self) -> String {
-    let mut prompt = format!("{}\n\n", self.base);
+    let mut prompt = format!("{}\n\n", self.read_base_context());
     let trimmed_messages = self
       .messages
       .iter()
@@ -79,7 +80,7 @@ impl Context {
   }
 
   pub fn read_messages(&mut self) {
-    match std::fs::read_to_string(self.file_path()) {
+    match std::fs::read_to_string(self.message_file_path()) {
       Err(_) => (),
       Ok(contents) => {
         for line in contents.trim().split("\n") {
@@ -103,16 +104,50 @@ impl Context {
       contents.push_str(&format!("{}: {}\n", message.sender, message.content))
     }
 
-    std::fs::write(self.file_path(), contents).unwrap();
+    std::fs::write(self.message_file_path(), contents).unwrap();
   }
 
-  pub fn file_path(&self) -> String {
-    let path = std::env::var("JACK_PATH").unwrap();
+  pub fn write_base_context(&self, base_context: &str) {
+    std::fs::write(self.context_file_path(), base_context).unwrap();
+  }
+
+  pub fn read_base_context(&self) -> String {
+    match std::fs::read_to_string(self.context_file_path()) {
+      Err(_) => crate::env::base_context(),
+      Ok(contents) => contents,
+    }
+  }
+
+  pub fn reset_messages(&self) {
+    let path = self.message_file_path();
+    let time = SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_secs();
+    let target = format!("{}.{}", path, time);
+    std::fs::rename(path, target).unwrap();
+  }
+
+  fn message_file_path(&self) -> String {
+    return self.file_path("messages".into());
+  }
+
+  fn context_file_path(&self) -> String {
+    return self.file_path("contexts".into());
+  }
+
+  fn file_path(&self, prefix: String) -> String {
+    let path = crate::env::path();
     if !std::path::Path::new(&path).exists() {
       panic!("JACK_PATH must be an existing folder")
     }
 
+    if !std::path::Path::new(&path).join(&prefix).exists() {
+      panic!("{}/{} must be an existing folder", &path, &prefix);
+    }
+
     std::path::Path::new(&path)
+      .join(&prefix)
       .join(self.id.clone())
       .to_str()
       .unwrap()
@@ -148,12 +183,13 @@ impl Message {
 }
 
 pub fn from_env(id: String) -> Context {
-  let base_context = std::env::var("JACK_BASE_CONTEXT").unwrap();
-  let bot_name = std::env::var("JACK_BOT_NAME").unwrap();
+  let base_context = crate::env::base_context();
+  let bot_name = crate::env::bot_name();
+  let engine = crate::env::engine();
 
   let mut context = Context::builder()
     .id(id)
-    .engine("curie".into())
+    .engine(engine)
     .temperature(1.0)
     .build()
     .unwrap();

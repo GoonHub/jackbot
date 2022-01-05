@@ -5,12 +5,9 @@ use serenity::framework::standard::{
   CommandResult, StandardFramework,
 };
 use serenity::model::channel::Message;
-use std::time::SystemTime;
-
-use std::env;
 
 #[group]
-#[commands(jack, more, reset)]
+#[commands(jack, more, reset, context, set_context)]
 struct General;
 
 struct Handler;
@@ -29,7 +26,7 @@ pub async fn bot() {
     .configure(|c| c.prefix("!"))
     .group(&GENERAL_GROUP);
 
-  let token = env::var("JACK_DISCORD_TOKEN").expect("token");
+  let token = crate::env::discord_token();
   let mut client = Client::builder(token)
     .event_handler(Handler)
     .framework(framework)
@@ -70,15 +67,29 @@ async fn more(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn reset(ctx: &Context, msg: &Message) -> CommandResult {
   let context = crate::context::from_env(msg.channel_id.to_string());
-  let path = context.file_path();
-  let time = SystemTime::now()
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .unwrap()
-    .as_secs();
-  let target = format!("{}.{}", path, time);
-  std::fs::rename(path, target).unwrap();
+  context.reset_messages();
 
-  msg.reply(ctx, "Reset :slight_smile:").await.unwrap();
+  msg.reply(ctx, "Good as new :slight_smile:").await.unwrap();
+
+  Ok(())
+}
+
+#[command]
+async fn context(ctx: &Context, msg: &Message) -> CommandResult {
+  let context = crate::context::from_env(msg.channel_id.to_string());
+  msg.reply(ctx, context.read_base_context()).await.unwrap();
+  Ok(())
+}
+
+#[command]
+async fn set_context(ctx: &Context, msg: &Message) -> CommandResult {
+  let context = crate::context::from_env(msg.channel_id.to_string());
+  context.write_base_context(&msg.content.replace("!set_context ", ""));
+
+  msg
+    .reply(ctx, "Context updated :writing_hand:")
+    .await
+    .unwrap();
 
   Ok(())
 }

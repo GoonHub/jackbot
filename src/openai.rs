@@ -46,7 +46,7 @@ pub async fn completion(
   let client = reqwest::Client::new();
   let body = serde_json::to_string(args).unwrap();
 
-  let api_token = std::env::var("JACK_OPENAI_KEY").unwrap();
+  let api_token = crate::env::openai_key();
   let response = client
     .post(url)
     .body(body.clone())
