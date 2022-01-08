@@ -121,7 +121,9 @@ impl Context {
       .unwrap()
       .as_secs();
     let target = format!("{}.{}", path, time);
-    std::fs::rename(path, target).unwrap();
+    if std::path::Path::new(&path).exists() {
+      std::fs::rename(path, target).unwrap();
+    }
   }
 
   fn message_file_path(&self) -> String {
