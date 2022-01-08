@@ -7,7 +7,7 @@ use serenity::framework::standard::{
 use serenity::model::channel::Message;
 
 #[group]
-#[commands(jack, more, reset, context, set_context)]
+#[commands(jack, more, reset, context, set_context, reset_context)]
 struct General;
 
 struct Handler;
@@ -91,5 +91,16 @@ async fn set_context(ctx: &Context, msg: &Message) -> CommandResult {
     .await
     .unwrap();
 
+  Ok(())
+}
+
+#[command]
+async fn reset_context(ctx: &Context, msg: &Message) -> CommandResult {
+  let context = crate::context::from_env(msg.channel_id.to_string());
+  context.reset_context();
+  msg
+    .reply(ctx, "Context reset :slight_smile:")
+    .await
+    .unwrap();
   Ok(())
 }

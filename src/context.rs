@@ -5,16 +5,11 @@ use std::time::SystemTime;
 pub struct Context {
   #[builder(setter(into), default = "\"default\".into()")]
   pub id: String,
-  #[builder(
-    setter(into),
-    default = "\"The following is a conversation with Jack who is friendly, clever and loves to give advice.\".into()"
-  )]
-  pub base: String,
-  #[builder(default = "20")]
+  #[builder(default = "50")]
   pub max_replies: u16,
   #[builder(default = "50")]
   pub max_tokens: u16,
-  #[builder(default = "1.0")]
+  #[builder(default = "0.7")]
   pub temperature: f32,
   #[builder(setter(into), default = "\"Jack\".into()")]
   pub bot_name: String,
@@ -32,7 +27,7 @@ impl Context {
 
   pub async fn completion(&mut self) -> Result<String, Box<dyn std::error::Error>> {
     let args = crate::openai::CompletionArgs::builder()
-      .prompt(self.clone().prompt())
+      .prompt(self.prompt())
       .engine(self.engine.clone())
       .max_tokens(self.max_tokens)
       .temperature(self.temperature)
@@ -61,21 +56,11 @@ impl Context {
         .build()
         .unwrap(),
     );
+
+    self.write_messages();
   }
 
   pub fn prompt(&self) -> String {
-    let mut prompt = format!("{}\n\n", self.read_base_context());
-    let trimmed_messages = self
-      .messages
-      .iter()
-      .rev()
-      .take(self.max_replies.into())
-      .rev();
-
-    for message in trimmed_messages {
-      prompt.push_str(format!("{}: {}\n", message.sender, message.content).as_ref());
-    }
-
     format!("{}{}:", self, self.bot_name)
   }
 
@@ -108,6 +93,7 @@ impl Context {
   }
 
   pub fn write_base_context(&self, base_context: &str) {
+    self.reset_context();
     std::fs::write(self.context_file_path(), base_context).unwrap();
   }
 
@@ -120,6 +106,16 @@ impl Context {
 
   pub fn reset_messages(&self) {
     let path = self.message_file_path();
+    let time = SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_secs();
+    let target = format!("{}.{}", path, time);
+    std::fs::rename(path, target).unwrap();
+  }
+
+  pub fn reset_context(&self) {
+    let path = self.context_file_path();
     let time = SystemTime::now()
       .duration_since(SystemTime::UNIX_EPOCH)
       .unwrap()
@@ -157,9 +153,15 @@ impl Context {
 
 impl Display for Context {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    write!(f, "{}\n\n", self.base)?;
+    write!(f, "{}\n\n", self.read_base_context())?;
+    let trimmed_messages = self
+      .messages
+      .iter()
+      .rev()
+      .take(self.max_replies.into())
+      .rev();
 
-    for message in &self.messages {
+    for message in trimmed_messages {
       write!(f, "{}: {}\n", message.sender, message.content)?;
     }
 
@@ -183,20 +185,10 @@ impl Message {
 }
 
 pub fn from_env(id: String) -> Context {
-  let base_context = crate::env::base_context();
   let bot_name = crate::env::bot_name();
   let engine = crate::env::engine();
 
-  let mut context = Context::builder()
-    .id(id)
-    .engine(engine)
-    .temperature(1.0)
-    .build()
-    .unwrap();
-
-  if !base_context.is_empty() {
-    context.base = base_context;
-  }
+  let mut context = Context::builder().id(id).engine(engine).build().unwrap();
 
   if !bot_name.is_empty() {
     context.bot_name = bot_name;
